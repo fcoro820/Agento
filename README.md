@@ -31,10 +31,17 @@ npm link
 agento
 ```
 
+Start with the lightweight TUI launcher:
+
+```bash
+agento-tui
+```
+
 Use another model:
 
 ```bash
 agento --model llama3.2
+agento-tui --model llama3.2
 ```
 
 Non-interactive helpers:
@@ -43,6 +50,7 @@ Non-interactive helpers:
 agento ask "review this project"
 agento run "npm test"
 agento models
+agento doctor
 ```
 
 Exit the session:
@@ -60,6 +68,34 @@ npm test
 ```
 
 This checks JavaScript syntax and command help output. It does not require a model request.
+
+Check the local Agento/Ollama environment:
+
+```bash
+agento doctor
+```
+
+`doctor` checks Node.js, package metadata, required files, Git state, linked commands, Ollama availability, configured model, and Agento limits. It does not start Ollama and does not send a chat request.
+
+## Project Layout
+
+```text
+bin/         CLI entrypoints for agento, agento-tui, and Ollama helper commands
+scripts/     Small npm script entrypoints
+src/         Core Agento modules for chat, config, doctor, and Ollama lifecycle
+tui.json     TUI launcher configuration
+```
+
+## TUI Config
+
+`bin/agento-tui.js` is a lightweight terminal UI launcher for the same Agento session.
+It reads `tui.json` for the title, prompt, quick-start hints, and command hints.
+
+Run it without installing the binary:
+
+```bash
+npm run tui
+```
 
 ## Coding Assistant Commands
 
@@ -80,6 +116,7 @@ Inside `agento`:
 /run <command>    Run a shell command and add output to context
 /edit <file> <task> Ask for a unified diff for a file
 /apply [file]     Apply a unified diff from a file or last assistant reply
+/changed          Show files changed in the working tree
 /save [file]      Save session
 /load [file]      Load session
 /clear            Clear chat history and file context
@@ -90,7 +127,7 @@ Typical flow:
 
 ```text
 /files
-/context package.json interactive.js
+/context package.json bin/agento.js
 /context "file with spaces.js"
 /run npm test
 /status
@@ -102,6 +139,7 @@ Patch flow:
 ```text
 ask Agento to return a unified diff
 /apply
+/changed
 ```
 
 Or apply a patch file:
@@ -154,6 +192,8 @@ npm run ollama:stop
 `/run` executes real shell commands in the current working directory. Agento asks for confirmation before commands that look risky, but the detection is heuristic and not a security sandbox. Read commands before confirming them.
 
 `/apply` runs `git apply --check` first, then asks for confirmation before applying the patch.
+Choose `yes` to apply once, `always` to apply future patches without asking again for the current session, or `no` to cancel.
+Use `/changed` to see working tree changes and files applied by Agento in the current session.
 
 `.agentoignore` controls directories skipped by `/files`.
 

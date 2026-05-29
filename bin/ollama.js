@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
-import { chat } from './agento.js'
-import { config } from './config.js'
+import { chat } from '../src/chat.js'
+import { config } from '../src/config.js'
 import {
   ensureOllamaServer,
   isOllamaReady,
@@ -10,7 +10,7 @@ import {
   shutdownOllama,
   stopManagedOllamaServer,
   unloadModel,
-} from './ollama.js'
+} from '../src/ollama.js'
 
 function printHelp() {
   console.log(`Usage:

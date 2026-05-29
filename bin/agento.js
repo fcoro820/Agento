@@ -15,9 +15,9 @@ import { dirname, resolve, relative } from 'node:path'
 import { createInterface } from 'node:readline'
 import { stdin as input, stdout as output } from 'node:process'
 import { promisify } from 'node:util'
-import { chat, parseChatArgs } from './agento.js'
-import { config } from './config.js'
-import { ensureOllamaServer, preloadModel, shutdownOllama } from './ollama.js'
+import { chat, parseChatArgs } from '../src/chat.js'
+import { config } from '../src/config.js'
+import { ensureOllamaServer, preloadModel, shutdownOllama } from '../src/ollama.js'
 
 const execAsync = promisify(exec)
 const execFileAsync = promisify(execFile)
@@ -50,8 +50,12 @@ let isShuttingDown = false
 let shouldCleanup = false
 let messages = [{ role: 'system', content: assistantPrompt }]
 const fileContexts = new Map()
+const appliedFiles = new Set()
 let lastAssistantContent = ''
+let applyWithoutPrompt = false
 const pipedInput = input.isTTY ? null : readFileSync(0, 'utf8')
+const isTuiMode = process.env.AGENTO_TUI === '1'
+const promptLabel = process.env.AGENTO_PROMPT || 'agento> '
 
 function debug(message) {
   if (config.debug) {
@@ -66,6 +70,7 @@ function shouldPrintCliHelp() {
 function printCliHelp() {
   console.log(`Usage:
   agento
+  agento doctor
   agento --model llama3.2
 
 Commands:
@@ -83,6 +88,7 @@ Commands:
   /run <command>    Run a shell command and add output to context
   /edit <file> <task> Ask for a unified diff for a file
   /apply [file]     Apply a unified diff from a file or last assistant reply
+  /changed          Show files changed in the working tree
   /save [file]      Save session
   /load [file]      Load session
   /clear            Clear chat history and file context
@@ -353,17 +359,46 @@ async function confirmRiskyCommand(command) {
   return answer.trim() === 'yes'
 }
 
-async function confirmAction(message) {
+async function confirmApplyPatch() {
+  if (applyWithoutPrompt) {
+    return true
+  }
+
   if (!rl) {
-    console.error(`${message} Blocked in non-interactive mode.`)
+    console.error('Apply patch? Blocked in non-interactive mode.')
     return false
   }
 
   const answer = await new Promise((resolveAnswer) => {
-    rl.question(`${message} Type "yes" to continue: `, resolveAnswer)
+    rl.question('Apply patch? [yes / always / no] ', resolveAnswer)
   })
+  const normalized = answer.trim().toLowerCase()
 
-  return answer.trim() === 'yes'
+  if (['yes', 'y'].includes(normalized)) {
+    return true
+  }
+
+  if (
+    [
+      'a',
+      'always',
+      'yes and dont ask again',
+      "yes and don't ask again",
+      'yes, dont ask again',
+      "yes, don't ask again",
+    ].includes(normalized)
+  ) {
+    applyWithoutPrompt = true
+    console.log('Apply confirmation disabled for this session.')
+    return true
+  }
+
+  if (['no', 'n'].includes(normalized)) {
+    return false
+  }
+
+  console.log('Patch cancelled. Use yes, always, or no.')
+  return false
 }
 
 async function runShellCommand(command) {
@@ -488,6 +523,16 @@ async function runNonInteractiveCommand(argv) {
 
   ;({ model } = parseChatArgs([]))
 
+  if (subcommand === 'doctor') {
+    if (rest.length > 0) {
+      throw new Error('Usage: agento doctor')
+    }
+
+    const { runDoctor } = await import('../src/doctor.js')
+    process.exitCode = await runDoctor()
+    return true
+  }
+
   if (subcommand === 'ask') {
     const prompt = rest.join(' ').trim()
     if (!prompt) {
@@ -534,6 +579,7 @@ function loadSession(target) {
 
 function clearContext() {
   fileContexts.clear()
+  appliedFiles.clear()
   messages = [{ role: 'system', content: assistantPrompt }]
   lastAssistantContent = ''
   console.log('Cleared chat history and file context.')
@@ -574,9 +620,56 @@ function extractPatchFromText(text) {
   return candidate
 }
 
+function extractPatchFiles(patchText) {
+  const files = new Set()
+
+  for (const line of patchText.split(/\r?\n/)) {
+    if (line.startsWith('diff --git ')) {
+      const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/)
+      if (match) {
+        files.add(match[2])
+      }
+      continue
+    }
+
+    if (line.startsWith('+++ b/')) {
+      files.add(line.slice('+++ b/'.length))
+    }
+  }
+
+  files.delete('/dev/null')
+  return [...files].sort()
+}
+
+async function getChangedFiles() {
+  try {
+    const result = await execFileAsync('git', ['status', '--short'], {
+      cwd: process.cwd(),
+      timeout: config.commandTimeoutMs,
+    })
+    return result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trimEnd())
+      .filter(Boolean)
+  } catch (error) {
+    throw new Error(`Could not read changed files: ${(error.stderr || error.message).trim()}`)
+  }
+}
+
+async function printChangedFiles() {
+  const changedFiles = await getChangedFiles()
+
+  console.log('Working tree changes:')
+  console.log(changedFiles.length > 0 ? changedFiles.join('\n') : '(none)')
+
+  console.log('\nApplied by Agento this session:')
+  console.log(appliedFiles.size > 0 ? [...appliedFiles].sort().join('\n') : '(none)')
+}
+
 async function applyUnifiedDiff(patchText) {
   const dir = mkdtempSync(resolve(tmpdir(), 'agento-'))
   const patchPath = resolve(dir, 'change.patch')
+  const patchFiles = extractPatchFiles(patchText)
   writeFileSync(patchPath, `${patchText}\n`)
 
   try {
@@ -591,7 +684,7 @@ async function applyUnifiedDiff(patchText) {
     })
     console.log(summary.stdout.trim() || 'Patch is valid.')
 
-    if (!(await confirmAction('Apply patch?'))) {
+    if (!(await confirmApplyPatch())) {
       console.log('Patch cancelled.')
       return
     }
@@ -600,7 +693,13 @@ async function applyUnifiedDiff(patchText) {
       cwd: process.cwd(),
       timeout: config.commandTimeoutMs,
     })
+    for (const file of patchFiles) {
+      appliedFiles.add(file)
+    }
     console.log('Patch applied.')
+    if (patchFiles.length > 0) {
+      console.log(`Changed files:\n${patchFiles.join('\n')}`)
+    }
   } catch (error) {
     const stderr = error.stderr || error.message
     throw new Error(`Patch failed: ${stderr.trim()}`)
@@ -754,6 +853,11 @@ async function handleCommand(inputLine) {
     return true
   }
 
+  if (command === '/changed') {
+    await printChangedFiles()
+    return true
+  }
+
   if (command === '/save') {
     saveSession(args[0])
     return true
@@ -782,14 +886,16 @@ try {
   await ensureOllamaServer()
   await preloadModel(model)
   console.log(`Agento coding assistant ready. Model: ${model}`)
-  printHelp()
+  if (!isTuiMode) {
+    printHelp()
+  }
   const source =
     pipedInput === null
       ? rl
       : pipedInput.split(/\r?\n/).filter((line) => line.length > 0)
 
   if (rl) {
-    rl.setPrompt('agento> ')
+    rl.setPrompt(promptLabel)
     rl.prompt()
   }
 

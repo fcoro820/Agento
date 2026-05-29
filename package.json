@@ -8,18 +8,21 @@
     "node": ">=22"
   },
   "bin": {
-    "agento": "./interactive.js"
+    "agento": "./bin/agento.js",
+    "agento-tui": "./bin/agento-tui.js"
   },
   "scripts": {
     "test": "npm run test:syntax && npm run test:help",
-    "test:syntax": "node --check config.js && node --check agento.js && node --check start.js && node --check interactive.js && node --check ollama.js && node --check ollama-cli.js",
-    "test:help": "node interactive.js --help && node ollama-cli.js --help",
-    "ask": "node start.js",
-    "dev": "node interactive.js",
-    "ollama": "node ollama-cli.js",
-    "ollama:serve": "node ollama-cli.js serve",
-    "ollama:run": "node ollama-cli.js run",
-    "ollama:models": "node ollama-cli.js models",
-    "ollama:stop": "node ollama-cli.js stop"
+    "test:syntax": "node --check src/config.js && node --check src/chat.js && node --check scripts/ask.js && node --check bin/agento.js && node --check src/ollama.js && node --check bin/ollama.js && node --check bin/agento-tui.js && node --check src/doctor.js",
+    "test:help": "node bin/agento.js --help && node bin/ollama.js --help && node bin/agento-tui.js --help && node bin/agento-tui.js --config",
+    "doctor": "node bin/agento.js doctor",
+    "ask": "node scripts/ask.js",
+    "dev": "node bin/agento.js",
+    "tui": "node bin/agento-tui.js",
+    "ollama": "node bin/ollama.js",
+    "ollama:serve": "node bin/ollama.js serve",
+    "ollama:run": "node bin/ollama.js run",
+    "ollama:models": "node bin/ollama.js models",
+    "ollama:stop": "node bin/ollama.js stop"
   }
 }

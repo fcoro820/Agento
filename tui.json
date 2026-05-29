@@ -1,0 +1,59 @@
+{
+  "title": "Agento",
+  "subtitle": "Local CLI-only AI coding assistant powered by Ollama",
+  "prompt": "agento> ",
+  "accent": "cyan",
+  "showCommandHints": true,
+  "quickStart": [
+    "/files",
+    "/context package.json bin/agento.js",
+    "/run npm test",
+    "review this project and suggest improvements"
+  ],
+  "commands": [
+    {
+      "command": "/help",
+      "description": "Show all commands"
+    },
+    {
+      "command": "/status",
+      "description": "Show model, context, limits, and session state"
+    },
+    {
+      "command": "/files [dir]",
+      "description": "List project files recursively"
+    },
+    {
+      "command": "/context <files>",
+      "description": "Add files to chat context"
+    },
+    {
+      "command": "/run <command>",
+      "description": "Run a shell command and add output to context"
+    },
+    {
+      "command": "/edit <file> <task>",
+      "description": "Ask the model for a unified diff"
+    },
+    {
+      "command": "/apply [file]",
+      "description": "Apply a unified diff after validation"
+    },
+    {
+      "command": "/changed",
+      "description": "Show changed files and Agento-applied files"
+    },
+    {
+      "command": "/save [file]",
+      "description": "Save the current session"
+    },
+    {
+      "command": "/load [file]",
+      "description": "Load a saved session"
+    },
+    {
+      "command": "/exit",
+      "description": "Stop the model and exit"
+    }
+  ]
+}

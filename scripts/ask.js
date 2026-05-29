@@ -1,5 +1,5 @@
-import { ensureOllamaServer, stopManagedOllamaServer } from './ollama.js'
-import { chat, parseChatArgs } from './agento.js'
+import { ensureOllamaServer, stopManagedOllamaServer } from '../src/ollama.js'
+import { chat, parseChatArgs } from '../src/chat.js'
 
 try {
   const { model, prompt } = parseChatArgs(process.argv.slice(2))
