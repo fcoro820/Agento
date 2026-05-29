@@ -1,0 +1,25 @@
+{
+  "name": "agento",
+  "version": "1.0.0",
+  "description": "Local CLI-only AI coding assistant powered by Ollama.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "agento": "./interactive.js"
+  },
+  "scripts": {
+    "test": "npm run test:syntax && npm run test:help",
+    "test:syntax": "node --check config.js && node --check agento.js && node --check start.js && node --check interactive.js && node --check ollama.js && node --check ollama-cli.js",
+    "test:help": "node interactive.js --help && node ollama-cli.js --help",
+    "ask": "node start.js",
+    "dev": "node interactive.js",
+    "ollama": "node ollama-cli.js",
+    "ollama:serve": "node ollama-cli.js serve",
+    "ollama:run": "node ollama-cli.js run",
+    "ollama:models": "node ollama-cli.js models",
+    "ollama:stop": "node ollama-cli.js stop"
+  }
+}
