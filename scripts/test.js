@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 const checks = [
   ['node', ['--check', 'src/config.js']],
   ['node', ['--check', 'src/chat.js']],
+  ['node', ['--check', 'src/commands.js']],
   ['node', ['--check', 'scripts/ask.js']],
   ['node', ['--check', 'scripts/test.js']],
   ['node', ['--check', 'bin/agento.js']],
@@ -46,4 +47,3 @@ for (const [command, args] of checks) {
     process.exit(exitCode)
   }
 }
-
