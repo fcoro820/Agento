@@ -247,7 +247,7 @@ export async function runDoctor() {
   console.log('')
   if (results.failed) {
     console.log('Doctor finished with failures.')
-    return 1
+    throw new Error('Doctor finished with failures.')
   }
 
   console.log('Doctor finished without blocking failures.')

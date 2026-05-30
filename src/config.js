@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+// This configuration is handled by Agento's core config system
 function loadEnvFile(path = resolve(process.cwd(), '.env')) {
   if (!existsSync(path)) {
     return

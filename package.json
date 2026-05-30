@@ -12,7 +12,7 @@
     "agento-tui": "./bin/agento-tui.js"
   },
   "scripts": {
-    "test": "node scripts/test.js",
+    "test": "node --test test/agento.test.js",
     "doctor": "node bin/agento.js doctor",
     "ask": "node scripts/ask.js",
     "dev": "node bin/agento.js",

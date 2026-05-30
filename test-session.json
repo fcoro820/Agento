@@ -1,0 +1,16 @@
+{
+  "model": "test-model",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Test Prompt"
+    }
+  ],
+  "fileContexts": [
+    [
+      "test.txt",
+      "hello world"
+    ]
+  ],
+  "lastAssistantContent": ""
+}
