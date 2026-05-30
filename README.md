@@ -94,7 +94,7 @@ Check the local Agento/Ollama environment:
 agento doctor
 ```
 
-`doctor` checks Node.js, package metadata, required files, Git state, linked commands, Ollama availability, configured model, and Agento limits. It does not start Ollama and does not send a chat request.
+`doctor` checks Node.js, the Agento installation files, the Git state of the directory where you run it, linked commands, Ollama availability, configured model, and Agento limits. It does not start Ollama and does not send a chat request.
 
 ## Project Layout
 
@@ -208,7 +208,7 @@ node bin/ollama.js stop
 
 ## Safety Note
 
-`/run` executes real shell commands in the current working directory. Agento asks for confirmation before commands that look risky, but the detection is heuristic and not a security sandbox. Read commands before confirming them.
+`/run` executes real shell commands in the current working directory. Agento asks for confirmation before commands that look risky, prints why the command was flagged, and requires typing `run` before execution. The detection is heuristic and not a security sandbox. Read commands before confirming them.
 
 `/apply` runs `git apply --check` first, then asks for confirmation before applying the patch.
 Choose `yes` to apply once, `always` to apply future patches without asking again for the current session, or `no` to cancel.

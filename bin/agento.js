@@ -342,6 +342,32 @@ function isRiskyCommand(command) {
   return riskyCommandPattern.test(command.trim())
 }
 
+function riskyCommandReasons(command) {
+  const trimmed = command.trim()
+  const reasons = []
+
+  if (/(^|\s)(rm|mv|cp|sudo|su|chmod|chown|mkfs|dd|truncate)\b/.test(trimmed)) {
+    reasons.push('can modify files or permissions')
+  }
+  if (/(^|\s)git\s+(reset|clean|checkout|restore)\b/.test(trimmed)) {
+    reasons.push('can discard or replace Git worktree changes')
+  }
+  if (/(^|\s)(pkill|kill|killall|shutdown|reboot)\b/.test(trimmed)) {
+    reasons.push('can stop processes or the machine')
+  }
+  if (/(^|\s)(curl|wget|bash|sh|node\s+-e|python\s+-c)\b/.test(trimmed)) {
+    reasons.push('can execute downloaded or inline code')
+  }
+  if (/(\||&&|\|\||;|`|\$\()/.test(trimmed)) {
+    reasons.push('contains shell control operators')
+  }
+  if (/(>\s*\/|>\s*[^>])/.test(trimmed)) {
+    reasons.push('redirects output and may overwrite files')
+  }
+
+  return reasons.length > 0 ? reasons : ['matches the risky-command heuristic']
+}
+
 async function confirmRiskyCommand(command) {
   if (!isRiskyCommand(command)) {
     return true
@@ -352,11 +378,14 @@ async function confirmRiskyCommand(command) {
     return false
   }
 
+  console.log(`Risky command detected: ${command}`)
+  console.log(`CWD: ${process.cwd()}`)
+  console.log(`Reason: ${riskyCommandReasons(command).join('; ')}`)
   const answer = await new Promise((resolveAnswer) => {
-    rl.question(`Risky command detected. Type "yes" to run it: `, resolveAnswer)
+    rl.question('Type "run" to execute it, or anything else to cancel: ', resolveAnswer)
   })
 
-  return answer.trim() === 'yes'
+  return answer.trim() === 'run'
 }
 
 async function confirmApplyPatch() {

@@ -1,12 +1,14 @@
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { config } from './config.js'
 import { isOllamaReady, listModels } from './ollama.js'
 
 const execFileAsync = promisify(execFile)
 const MIN_NODE_MAJOR = 22
+const agentoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 function printCheck(status, label, detail = '') {
   const marker = {
@@ -20,7 +22,7 @@ function printCheck(status, label, detail = '') {
 async function capture(command, args, options = {}) {
   try {
     const result = await execFileAsync(command, args, {
-      cwd: process.cwd(),
+      cwd: options.cwd || process.cwd(),
       timeout: options.timeout || 5000,
     })
     return {
@@ -43,7 +45,7 @@ async function commandPath(command) {
 }
 
 function readPackageJson() {
-  const path = resolve(process.cwd(), 'package.json')
+  const path = resolve(agentoRoot, 'package.json')
   if (!existsSync(path)) {
     return null
   }
@@ -78,11 +80,15 @@ function checkPackage(results) {
   const packageJson = readPackageJson()
   if (!packageJson) {
     results.failed = true
-    printCheck('fail', 'package.json', 'missing or invalid')
+    printCheck('fail', 'Agento package.json', 'missing or invalid')
     return
   }
 
-  printCheck('pass', 'package.json', `${packageJson.name || 'unknown'}@${packageJson.version || '0.0.0'}`)
+  printCheck(
+    'pass',
+    'Agento package.json',
+    `${packageJson.name || 'unknown'}@${packageJson.version || '0.0.0'}`
+  )
 
   if (packageJson.bin?.agento === './bin/agento.js') {
     printCheck('pass', 'agento binary config', packageJson.bin.agento)
@@ -112,7 +118,7 @@ function checkLocalFiles(results) {
   ]
 
   for (const file of requiredFiles) {
-    if (existsSync(resolve(process.cwd(), file))) {
+    if (existsSync(resolve(agentoRoot, file))) {
       printCheck('pass', file, 'found')
     } else {
       results.failed = true
@@ -128,6 +134,7 @@ function checkLocalFiles(results) {
 }
 
 function checkConfig() {
+  printCheck('pass', 'Agento root', agentoRoot)
   printCheck('pass', 'configured model', config.model)
   printCheck('pass', 'Ollama host', config.host)
   printCheck('pass', 'request timeout', `${config.requestTimeoutMs}ms`)

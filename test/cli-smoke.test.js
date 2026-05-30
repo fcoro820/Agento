@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { chmod, readFile } from 'node:fs/promises'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, resolve } from 'node:path'
+import { delimiter, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import assert from 'node:assert/strict'
@@ -16,6 +16,18 @@ async function runNode(args) {
     cwd: rootDir,
     timeout: 5000,
   })
+}
+
+async function createFakeOllamaCommand(tempDir) {
+  const binDir = resolve(tempDir, 'bin')
+  const commandPath = resolve(binDir, 'ollama')
+  await mkdir(binDir, { recursive: true })
+  await writeFile(
+    commandPath,
+    '#!/usr/bin/env sh\nif [ "$1" = "--version" ]; then echo "ollama fake"; fi\nexit 0\n'
+  )
+  await chmod(commandPath, 0o755)
+  return binDir
 }
 
 test('CLI help entrypoints load without starting Ollama', async () => {
@@ -53,6 +65,7 @@ test('Ollama helper help documents direct node usage', async () => {
 
 test('doctor fails a repository with an unreadable HEAD object', async () => {
   const tempDir = await mkdtemp(resolve(tmpdir(), 'agento-broken-git-'))
+  const fakeBin = await createFakeOllamaCommand(tempDir)
   const gitDir = resolve(tempDir, '.git')
   const missingCommit = '1111111111111111111111111111111111111111'
 
@@ -68,6 +81,7 @@ test('doctor fails a repository with an unreadable HEAD object', async () => {
   await assert.rejects(
     execFileAsync(process.execPath, [resolve(rootDir, 'bin/agento.js'), 'doctor'], {
       cwd: tempDir,
+      env: { ...process.env, PATH: `${fakeBin}${delimiter}${process.env.PATH}` },
       timeout: 5000,
     }),
     (error) => {
@@ -76,4 +90,18 @@ test('doctor fails a repository with an unreadable HEAD object', async () => {
       return true
     }
   )
+})
+
+test('doctor checks the Agento installation when run from another project', async () => {
+  const tempDir = await mkdtemp(resolve(tmpdir(), 'agento-external-project-'))
+  const fakeBin = await createFakeOllamaCommand(tempDir)
+  const { stdout } = await execFileAsync(process.execPath, [resolve(rootDir, 'bin/agento.js'), 'doctor'], {
+    cwd: tempDir,
+    env: { ...process.env, PATH: `${fakeBin}${delimiter}${process.env.PATH}` },
+    timeout: 5000,
+  })
+
+  assert.match(stdout, /PASS Agento package\.json/)
+  assert.doesNotMatch(stdout, /FAIL package\.json/)
+  assert.doesNotMatch(stdout, /FAIL bin\/agento\.js/)
 })
