@@ -4,20 +4,25 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
-  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, resolve, relative } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { stdin as input, stdout as output } from 'node:process'
 import { promisify } from 'node:util'
 import { chat, parseChatArgs } from '../src/chat.js'
 import { isRiskyCommand, parseCommandLine, riskyCommandReasons } from '../src/commands.js'
 import { config } from '../src/config.js'
+import {
+  formatPath,
+  listDirectoryEntries,
+  listProjectFiles as collectProjectFiles,
+  readTextFile as readProjectTextFile,
+  resolveInsideCwd,
+} from '../src/files.js'
 import { ensureOllamaServer, listModels, preloadModel, shutdownOllama } from '../src/ollama.js'
 import { extractPatchFiles, extractPatchFromText } from '../src/patches.js'
 
@@ -29,21 +34,6 @@ Be practical and concise. Help inspect, explain, debug, and modify software proj
 When you need file contents, ask the user to run /read or /context for specific files.
 Do not claim you changed files unless the user explicitly applies your suggested patch.
 Prefer concrete commands, file paths, and small patches over vague advice.`
-
-const ignoredDirectories = new Set([
-  '.cache',
-  '.git',
-  '.next',
-  '.nuxt',
-  '.output',
-  'build',
-  'coverage',
-  'dist',
-  'node_modules',
-  'out',
-  'target',
-  'vendor',
-])
 
 let model
 let isShuttingDown = false
@@ -106,106 +96,17 @@ if (shouldPrintCliHelp()) {
 let pipedInput = null
 let rl = null
 
-function readIgnoreDirectories() {
-  const ignoreFile = resolve(process.cwd(), '.agentoignore')
-  if (!existsSync(ignoreFile)) {
-    return ignoredDirectories
-  }
-
-  const customIgnored = new Set(ignoredDirectories)
-  for (const line of readFileSync(ignoreFile, 'utf8').split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (trimmed && !trimmed.startsWith('#') && !trimmed.includes('*')) {
-      customIgnored.add(trimmed.replace(/\/$/, ''))
-    }
-  }
-
-  return customIgnored
-}
-
-function resolveInsideCwd(target = '.') {
-  const cwd = process.cwd()
-  const resolved = resolve(cwd, target)
-
-  if (resolved !== cwd && !resolved.startsWith(`${cwd}/`)) {
-    throw new Error(`Path is outside the current project: ${target}`)
-  }
-
-  return resolved
-}
-
-function formatPath(path) {
-  const rel = relative(process.cwd(), path)
-  return rel || '.'
-}
-
-function isProbablyText(buffer) {
-  return !buffer.includes(0)
-}
-
 function readTextFile(target) {
-  const filePath = resolveInsideCwd(target)
-  const stats = statSync(filePath)
-
-  if (!stats.isFile()) {
-    throw new Error(`Not a file: ${target}`)
-  }
-
-  if (stats.size > config.maxFileBytes) {
-    throw new Error(
-      `File is too large (${stats.size} bytes). Limit: ${config.maxFileBytes} bytes.`
-    )
-  }
-
-  const buffer = readFileSync(filePath)
-
-  if (!isProbablyText(buffer)) {
-    throw new Error(`File appears to be binary: ${target}`)
-  }
-
-  return {
-    path: formatPath(filePath),
-    content: buffer.toString('utf8'),
-  }
+  return readProjectTextFile(target, { maxFileBytes: config.maxFileBytes })
 }
 
 function listDirectory(target = '.') {
-  const dirPath = resolveInsideCwd(target)
-  const entries = readdirSync(dirPath, { withFileTypes: true })
-    .filter((entry) => entry.name !== 'node_modules' && !entry.name.startsWith('.git'))
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map((entry) => `${entry.isDirectory() ? 'd' : '-'} ${entry.name}`)
-
+  const entries = listDirectoryEntries(target)
   console.log(entries.join('\n') || '(empty)')
 }
 
-function collectFiles(dirPath, files = []) {
-  const ignored = readIgnoreDirectories()
-  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
-    if (entry.isDirectory() && ignored.has(entry.name)) {
-      continue
-    }
-
-    const fullPath = resolve(dirPath, entry.name)
-
-    if (entry.isDirectory()) {
-      collectFiles(fullPath, files)
-      continue
-    }
-
-    files.push(formatPath(fullPath))
-
-    if (files.length >= config.maxFileList) {
-      return files
-    }
-  }
-
-  return files
-}
-
 function listProjectFiles(target = '.') {
-  const dirPath = resolveInsideCwd(target)
-  const files = collectFiles(dirPath).sort()
+  const files = collectProjectFiles(target, { maxFileList: config.maxFileList })
   const truncated = files.length >= config.maxFileList
   console.log(files.join('\n') || '(empty)')
   if (truncated) {

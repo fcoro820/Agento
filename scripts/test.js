@@ -13,6 +13,7 @@ const checks = [
   ['node', ['--check', 'bin/ollama.js']],
   ['node', ['--check', 'bin/agento-tui.js']],
   ['node', ['--check', 'src/doctor.js']],
+  ['node', ['--check', 'src/files.js']],
   ['node', ['bin/agento.js', '--help']],
   ['node', ['bin/ollama.js', '--help']],
   ['node', ['bin/agento-tui.js', '--help']],
