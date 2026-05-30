@@ -9,6 +9,7 @@ const checks = [
   ['node', ['--check', 'scripts/test.js']],
   ['node', ['--check', 'bin/agento.js']],
   ['node', ['--check', 'src/ollama.js']],
+  ['node', ['--check', 'src/patches.js']],
   ['node', ['--check', 'bin/ollama.js']],
   ['node', ['--check', 'bin/agento-tui.js']],
   ['node', ['--check', 'src/doctor.js']],
