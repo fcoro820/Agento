@@ -136,14 +136,24 @@ function checkConfig() {
   printCheck('pass', 'max context bytes', `${config.maxContextBytes}`)
 }
 
-async function checkGit() {
-  const result = await capture('git', ['rev-parse', '--show-toplevel'])
-  if (result.ok) {
-    printCheck('pass', 'Git repository', result.stdout)
+async function checkGit(results) {
+  const root = await capture('git', ['rev-parse', '--show-toplevel'])
+  if (!root.ok) {
+    printCheck('warn', 'Git repository', 'not inside a git repository')
     return
   }
 
-  printCheck('warn', 'Git repository', 'not inside a git repository')
+  const head = await capture('git', ['rev-parse', '--verify', 'HEAD'])
+  const status = await capture('git', ['status', '--short'])
+
+  if (!head.ok || !status.ok) {
+    results.failed = true
+    const detail = [head.stderr, status.stderr].filter(Boolean).join('; ')
+    printCheck('fail', 'Git repository', detail || 'repository metadata is not readable')
+    return
+  }
+
+  printCheck('pass', 'Git repository', root.stdout)
 }
 
 async function checkLinkedCommands() {
@@ -223,7 +233,7 @@ export async function runDoctor() {
   checkPackage(results)
   checkLocalFiles(results)
   checkConfig()
-  await checkGit()
+  await checkGit(results)
   await checkLinkedCommands()
   await checkOllama(results)
 

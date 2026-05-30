@@ -12,9 +12,7 @@
     "agento-tui": "./bin/agento-tui.js"
   },
   "scripts": {
-    "test": "npm run test:syntax && npm run test:help",
-    "test:syntax": "node --check src/config.js && node --check src/chat.js && node --check scripts/ask.js && node --check bin/agento.js && node --check src/ollama.js && node --check bin/ollama.js && node --check bin/agento-tui.js && node --check src/doctor.js",
-    "test:help": "node bin/agento.js --help && node bin/ollama.js --help && node bin/agento-tui.js --help && node bin/agento-tui.js --config",
+    "test": "node scripts/test.js",
     "doctor": "node bin/agento.js doctor",
     "ask": "node scripts/ask.js",
     "dev": "node bin/agento.js",
