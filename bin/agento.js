@@ -17,7 +17,7 @@ import { stdin as input, stdout as output } from 'node:process'
 import { promisify } from 'node:util'
 import { chat, parseChatArgs } from '../src/chat.js'
 import { config } from '../src/config.js'
-import { ensureOllamaServer, preloadModel, shutdownOllama } from '../src/ollama.js'
+import { ensureOllamaServer, listModels, preloadModel, shutdownOllama } from '../src/ollama.js'
 
 const execAsync = promisify(exec)
 const execFileAsync = promisify(execFile)
@@ -53,7 +53,6 @@ const fileContexts = new Map()
 const appliedFiles = new Set()
 let lastAssistantContent = ''
 let applyWithoutPrompt = false
-const pipedInput = input.isTTY ? null : readFileSync(0, 'utf8')
 const isTuiMode = process.env.AGENTO_TUI === '1'
 const promptLabel = process.env.AGENTO_PROMPT || 'agento> '
 
@@ -104,7 +103,8 @@ if (shouldPrintCliHelp()) {
   process.exit(0)
 }
 
-const rl = pipedInput === null ? createInterface({ input, output }) : null
+let pipedInput = null
+let rl = null
 
 function readIgnoreDirectories() {
   const ignoreFile = resolve(process.cwd(), '.agentoignore')
@@ -439,7 +439,6 @@ async function runShellCommand(command) {
 }
 
 async function listAvailableModels() {
-  const { listModels } = await import('./ollama.js')
   const names = await listModels()
   console.log(names.length > 0 ? names.join('\n') : 'No local Ollama models found.')
 }
@@ -877,67 +876,70 @@ async function handleCommand(inputLine) {
 }
 
 try {
-  if (await runNonInteractiveCommand(process.argv.slice(2))) {
-    process.exit(0)
-  }
+  const handledNonInteractive = await runNonInteractiveCommand(process.argv.slice(2))
 
-  ;({ model } = parseChatArgs(process.argv.slice(2)))
-  shouldCleanup = true
-  await ensureOllamaServer()
-  await preloadModel(model)
-  console.log(`Agento coding assistant ready. Model: ${model}`)
-  if (!isTuiMode) {
-    printHelp()
-  }
-  const source =
-    pipedInput === null
-      ? rl
-      : pipedInput.split(/\r?\n/).filter((line) => line.length > 0)
+  if (!handledNonInteractive) {
+    pipedInput = input.isTTY ? null : readFileSync(0, 'utf8')
+    rl = pipedInput === null ? createInterface({ input, output }) : null
 
-  if (rl) {
-    rl.setPrompt(promptLabel)
-    rl.prompt()
-  }
+    ;({ model } = parseChatArgs(process.argv.slice(2)))
+    shouldCleanup = true
+    await ensureOllamaServer()
+    await preloadModel(model)
+    console.log(`Agento coding assistant ready. Model: ${model}`)
+    if (!isTuiMode) {
+      printHelp()
+    }
+    const source =
+      pipedInput === null
+        ? rl
+        : pipedInput.split(/\r?\n/).filter((line) => line.length > 0)
 
-  for await (const line of source) {
-    const prompt = line.trim()
-
-    if (!prompt) {
-      rl?.prompt()
-      continue
+    if (rl) {
+      rl.setPrompt(promptLabel)
+      rl.prompt()
     }
 
-    try {
-      if (prompt.startsWith('/')) {
-        const shouldContinue = await handleCommand(prompt)
-        if (!shouldContinue) {
-          break
-        }
+    for await (const line of source) {
+      const prompt = line.trim()
+
+      if (!prompt) {
         rl?.prompt()
         continue
       }
 
-      messages.push({ role: 'user', content: prompt })
-      trimHistory()
+      try {
+        if (prompt.startsWith('/')) {
+          const shouldContinue = await handleCommand(prompt)
+          if (!shouldContinue) {
+            break
+          }
+          rl?.prompt()
+          continue
+        }
 
-      const content = await chat({
-        model,
-        prompt,
-        messages: buildMessagesForRequest(),
-        keepAlive: -1,
-      })
-      lastAssistantContent = content
-      messages.push({ role: 'assistant', content })
-      trimHistory()
-      console.log(`\n${content}\n`)
-    } catch (error) {
-      if (!prompt.startsWith('/')) {
-        messages.pop()
+        messages.push({ role: 'user', content: prompt })
+        trimHistory()
+
+        const content = await chat({
+          model,
+          prompt,
+          messages: buildMessagesForRequest(),
+          keepAlive: -1,
+        })
+        lastAssistantContent = content
+        messages.push({ role: 'assistant', content })
+        trimHistory()
+        console.log(`\n${content}\n`)
+      } catch (error) {
+        if (!prompt.startsWith('/')) {
+          messages.pop()
+        }
+        console.error(error.message)
       }
-      console.error(error.message)
-    }
 
-    rl?.prompt()
+      rl?.prompt()
+    }
   }
 } catch (error) {
   console.error(error.message)

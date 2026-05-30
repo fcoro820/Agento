@@ -18,6 +18,23 @@ deepseek-coder
 
 ## Install
 
+Agento has no npm package dependencies. You can run it directly with Node:
+
+```bash
+node bin/agento.js
+```
+
+To make `agento` and `agento-tui` available on your shell `PATH` without npm:
+
+```bash
+mkdir -p ~/.local/bin
+chmod +x bin/agento.js bin/agento-tui.js
+ln -s "$PWD/bin/agento.js" ~/.local/bin/agento
+ln -s "$PWD/bin/agento-tui.js" ~/.local/bin/agento-tui
+```
+
+Or use npm only for linking:
+
 ```bash
 npm install
 npm link
@@ -64,10 +81,12 @@ Exit the session:
 Run local checks:
 
 ```bash
-npm test
+node scripts/test.js
 ```
 
-This checks JavaScript syntax and command help output. It does not require a model request.
+This checks JavaScript syntax, command help output, and smoke tests. It does not require a model request.
+
+`npm test` is still available as a shortcut, but npm is not required for validation.
 
 Check the local Agento/Ollama environment:
 
@@ -94,7 +113,7 @@ It reads `tui.json` for the title, prompt, quick-start hints, and command hints.
 Run it without installing the binary:
 
 ```bash
-npm run tui
+node bin/agento-tui.js
 ```
 
 ## Coding Assistant Commands
@@ -129,7 +148,7 @@ Typical flow:
 /files
 /context package.json bin/agento.js
 /context "file with spaces.js"
-/run npm test
+/run node scripts/test.js
 /status
 review this CLI and suggest improvements
 ```
@@ -179,12 +198,12 @@ OLLAMA_MODEL=llama3.2 agento
 ## Ollama Helpers
 
 ```bash
-npm run ask -- "quick one-shot prompt"
-npm run dev
-npm run ollama:serve
-npm run ollama:models
-npm run ollama:run -- "Hello!"
-npm run ollama:stop
+node scripts/ask.js "quick one-shot prompt"
+node bin/agento.js
+node bin/ollama.js serve
+node bin/ollama.js models
+node bin/ollama.js run "Hello!"
+node bin/ollama.js stop
 ```
 
 ## Safety Note

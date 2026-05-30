@@ -14,12 +14,12 @@ import {
 
 function printHelp() {
   console.log(`Usage:
-  npm run ollama:serve
-  npm run ollama:run -- "Hello!"
-  npm run ollama:run -- --model llama3.2 "Hello!"
-  npm run ollama:models
-  npm run ollama:stop
-  npm run ollama:stop -- --model llama3.2
+  node bin/ollama.js serve
+  node bin/ollama.js run "Hello!"
+  node bin/ollama.js run --model llama3.2 "Hello!"
+  node bin/ollama.js models
+  node bin/ollama.js stop
+  node bin/ollama.js stop --model llama3.2
 
 Default model: ${config.model}
 Ollama host: ${config.host}`)
